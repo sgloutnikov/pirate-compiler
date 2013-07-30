@@ -1,0 +1,13 @@
+When applying the mathematical call to 45 / 2.0
+the type is check and converted to real rather than integer
+22.5
+
+Precedence results to : 
+-3
+
+Precedence Real results to : 
+5.0
+
+Entered Else
+100
+200

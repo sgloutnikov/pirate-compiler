@@ -1,0 +1,54 @@
+--- VARIABLE DECLARATION ERROR ON LINE 11 AT b ---
+--- VARIABLE DECLARATION ERROR ON LINE 12 AT c ---
+--- VARIABLE DECLARATION ERROR ON LINE 13 AT blabla ---
+--- VARIABLE DECLARATION ERROR ON LINE 14 AT truee ---
+--- TYPE MISMATCH ON LINE 15 AT 10.1 ---
+--- VARIABLE DECLARATION ERROR ON LINE 16 AT double ---
+--- VARIABLE DECLARATION ERROR ON LINE 17 AT trrrrue ---
+--- VARIABLE DECLARATION ERROR ON LINE 18 AT fffalse ---
+--- TYPE MISMATCH ON LINE 19 AT false ---
+--- TYPE MISMATCH ON LINE 20 AT "dfe" ---
+--- TYPE MISMATCH ON LINE 21 AT 10 ---
+--- VARIABLE DECLARATION ERROR ON LINE 22 AT "dfdsf$ 	/* missing end " ---
+--- TYPE MISMATCH ON LINE 25 AT 100 ---
+--- ALREADY DECLARED VARIABLE ON LINE 26 AT x ---
+--- USE OF UNDECLARED VARIABLE Forrre ON LINE: 32 ---
+--- USE OF UNDECLARED VARIABLE WalkThePlank ON LINE: 34 ---
+--- PARSE ERROR ON LINE 35 AT x
+--- TYPE MISMATCH ON LINE 41 AT 100 ---
+--- USE OF UNDECLARED VARIABLE drunk ON LINE: 46 ---
+--- USE OF UNDECLARED VARIABLE drunk ON LINE: 50 ---
+--- PARSE ERROR ON LINE 52 AT Overboard
+--- MISSING RETURN TYPE OR PARAMETER TYPE ON LINE 56 AT rumai ---
+--- USE OF UNDECLARED VARIABLE xx ON LINE: 65 ---
+--- USE OF UNDECLARED VARIABLE MaakeSail ON LINE: 68 ---
+--- USE OF UNDECLARED VARIABLE WaalkThePlank ON LINE: 76 ---
+
+		0.047 seconds total code generation time.
+		25 error(s) encountered.
+
+         _______________ 
+        /               \ 
+       /                 \ 
+      /                   \ 
+      |   XXXX     XXXX   |
+      |   XXXX     XXXX   |
+      |   XXX       XXX   |
+      |         X         |
+      \__      XXX      __/
+        |\     XXX     /|
+        | |           | |
+        | I I I I I I I |       Jolly Rodger!
+        |  I I I I I I  |        25 errors!
+        \_             _/
+          \_         _/
+            \_______/
+    XXX                    XXX
+   XXXXX                  XXXXX
+   XXXXXXXXX         XXXXXXXXXX
+          XXXXX   XXXXX
+             XXXXXXX
+          XXXXX   XXXXX
+   XXXXXXXXX         XXXXXXXXXX
+   XXXXX                  XXXXX
+    XXX                    XXX

@@ -1,0 +1,1062 @@
+/**
+ * JavaCC file
+ */
+ 
+options {
+  JDK_VERSION = "1.5";
+  JJTREE_OUTPUT_DIRECTORY="src/wci/frontend";
+  NODE_EXTENDS="wci.intermediate.icodeimpl.ICodeNodeImpl";
+  MULTI=true;
+  VISITOR=true;
+  //DEBUG_PARSER = true; // DELETE LATER
+}
+PARSER_BEGIN(PirateParser)
+package wci.frontend;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Set;
+import java.io.*;
+
+import wci.intermediate.*;
+import wci.intermediate.symtabimpl.*;
+import wci.backend.*;
+import wci.util.*;
+
+import static wci.intermediate.symtabimpl.SymTabKeyImpl.*;
+import static wci.intermediate.symtabimpl.DefinitionImpl.*;
+import static wci.intermediate.symtabimpl.RoutineCodeImpl.*;
+import static wci.intermediate.symtabimpl.SymTabKeyImpl.*;
+import static wci.intermediate.icodeimpl.ICodeKeyImpl.*;
+
+public class PirateParser {
+
+    private static final String SOURCE_SUFFIX = ".arr";
+    private static final String OUTPUT_SUFFIX = ".j";
+
+    private static SymTabStack symTabStack;
+    private static SymTabEntry programId;
+	private static HashMap<SymTabEntry, SimpleNode> funcAndProcs = new HashMap<SymTabEntry, SimpleNode>();
+	private static int errorCount = 0;
+	
+	public static void main(String args[]) {
+      try {
+        
+		long startTime = System.currentTimeMillis();
+      
+    	// Create and initialize the symbol table stack.
+        symTabStack = SymTabFactory.createSymTabStack();
+        Predefined.initialize(symTabStack);
+
+  		// Create the output file path which ends in .j
+        String sourceFilePath = args[0];
+        int truncatedLength = sourceFilePath.length() - SOURCE_SUFFIX.length();
+        int suffixIndex = sourceFilePath.lastIndexOf(SOURCE_SUFFIX);
+        String objectFilePath = (suffixIndex == truncatedLength)
+            ? sourceFilePath.substring(0, truncatedLength) + OUTPUT_SUFFIX
+            : sourceFilePath + OUTPUT_SUFFIX;
+    	
+    	// Parse a Pirate program.
+        Reader reader = new FileReader(args[0]);
+        PirateParser parser = new PirateParser(reader);
+        SimpleNode rootNode = parser.PirateProgram();
+        
+        if(errorCount == 0)
+        {        
+        // Print the cross-reference table.
+        CrossReferencer crossReferencer = new CrossReferencer();
+        crossReferencer.print(symTabStack);
+
+        // Visit the parse tree nodes to decorate them with type information.
+        TypeSetterVisitor typeVisitor = new TypeSetterVisitor();
+        rootNode.jjtAccept(typeVisitor, null);
+
+        // Create and initialize the ICode wrapper for the parse tree.
+        ICode iCode = ICodeFactory.createICode();
+        iCode.setRoot(rootNode);
+        programId.setAttribute(ROUTINE_ICODE, iCode);
+        
+        // Print the parse tree.
+        ParseTreePrinter treePrinter = new ParseTreePrinter(System.out);
+        treePrinter.print(symTabStack);
+            
+        // Create the compiler backend and generate code.
+        Backend backend = BackendFactory.createBackend("compile");
+        backend.process(iCode, symTabStack, objectFilePath);
+    	
+    	// Print the compiler summary message.
+        float elapsedTime = (System.currentTimeMillis() - startTime)/1000f;
+        System.out.println("\n\t\t" + elapsedTime + " seconds total code generation time.\n");
+    	}
+    	else
+    	{
+    		float elapsedTime = (System.currentTimeMillis() - startTime)/1000f;
+    		System.out.println("\n\t\t" + elapsedTime + " seconds total code generation time.");
+			System.out.println("\t\t" + errorCount + " error(s) encountered.");
+    		System.out.println();
+    		
+    		if (errorCount <= 5)
+    		{
+	    		System.out.println("              .-  .-.  -.                                          ");
+	    		System.out.println("            _/ '=(0.0)=' \\_                                        ");
+	    		System.out.println("          /`   .='|m|'=.   `\\                                      ");
+	    		System.out.println("          \\________________ /                                      ");
+	    		System.out.println("      .--.__///`'-,__~\\\\\\\\~`    Arrrr! There be " + errorCount + " error(s) on our ship!");
+	    		System.out.println("     / /6|__\\// a (__)-\\\\\\\\      Our ship is sinking!!!");
+	    		System.out.println("     \\ \\/--`((   ._\\   ,)))                                        ");
+	    		System.out.println("     /  \\\\  ))\\  -==-  (O)(                                        ");
+	    		System.out.println("    /    )\\((((\\   .  /)))))                                       ");
+	    		System.out.println("   /  _.' /  __(`~~~~`)__                                          ");
+	    		System.out.println("  //\"\\\\,-'-\"`   `~~~~\\\\~~`\"-.                                      ");
+	    		System.out.println(" //  /`\"              `      `\\                                    ");
+	    		System.out.println("//                                                                 ");
+    		} else {
+				System.out.println("         _______________ ");
+				System.out.println("        /               \\ ");
+				System.out.println("       /                 \\ ");
+				System.out.println("      /                   \\ ");
+				System.out.println("      |   XXXX     XXXX   |");
+				System.out.println("      |   XXXX     XXXX   |");
+				System.out.println("      |   XXX       XXX   |");
+				System.out.println("      |         X         |");
+				System.out.println("      \\__      XXX      __/");
+				System.out.println("        |\\     XXX     /|");
+				System.out.println("        | |           | |");
+				System.out.println("        | I I I I I I I |       Jolly Rodger!");
+				System.out.println("        |  I I I I I I  |        " + errorCount + " errors!");
+				System.out.println("        \\_             _/");
+				System.out.println("          \\_         _/");
+				System.out.println("            \\_______/");
+				System.out.println("    XXX                    XXX");
+				System.out.println("   XXXXX                  XXXXX");
+				System.out.println("   XXXXXXXXX         XXXXXXXXXX");
+				System.out.println("          XXXXX   XXXXX");
+				System.out.println("             XXXXXXX");
+				System.out.println("          XXXXX   XXXXX");
+				System.out.println("   XXXXXXXXX         XXXXXXXXXX");
+				System.out.println("   XXXXX                  XXXXX");
+				System.out.println("    XXX                    XXX");
+    		}
+    		
+    		
+    	}
+      } catch (Exception e)      {
+        e.printStackTrace();
+      }
+    }
+  }
+PARSER_END(PirateParser)
+
+SKIP : 
+{
+ 	" "
+|	"\r"
+|	"\t"
+|	"\n"
+|   < "//" (~["\n","\r"])*("\n"|"\r") > // single line comment
+|   < "/*" > : SLASH_STAR // beginning of multi-line comment
+}
+
+< SLASH_STAR > SKIP :
+{
+    < "*/" > : DEFAULT // end of multi-line comment
+|   < ~[] >
+}
+
+TOKEN : /* CHARACTER TOKENS */
+{
+  < CHARACTER : (["'"]){1}(((["\\"]){1}("n"|"t"|"'"|"\\"))|(~["'"]){1})(["'"]){1} >
+}
+
+TOKEN : /* STRING TOKENS */
+{
+  < STRING : (["\""]){1}((["\\"]){1}("n"|"t"|"\""|"\\")|(~["\"","\\","\n"]))*(["\""]){1} >
+}
+
+TOKEN : /* RESERVED WORDS */
+{
+	< BUCCANEERS : "Buccaneers" > // start of variable declarations 
+//|   < WALKTHEPLANK : "WalkThePlank" > // break
+|   < THARSHEBLOWS : "TharSheBlows" >  // else
+//|	< SHIVERMETIMBERS : "ShiverMeTimbers" > // switch  
+//|	< AHOY : "Ahoy" > // case
+|   < FORE : "Fore" > // for
+|   < RUM : "RUM" > // integer variable in fore statement
+//|	< POOPDECK : "PoopDeck" > // default case
+|   < ARRR : "Arrr" > // if
+|   < MAKESAIL : "MakeSail" > // while
+//|   < STEER : "Steer" > // do
+//|   < LOOT : "Loot" > // cond 
+|	< GUNNER : "Gunner" > // function declaration
+|	< OVERBOARD : "Overboard" > // return
+| 	< PILLAGE :  "Pillage" > // procedure declaration
+|   <WEIGHANCHOR : "WeighAnchor"> // main procedure
+|   <YOHOHO : "YoHoHo"> // program
+|   <HARHARHAR : "HarHarHar"> // print
+//|   < CONST : "const" > // TBD
+//|   < FLOAT_TOKEN : "float" > // TBD
+//|   < SHORT : "short" > // TBD
+//| 	< LONG : "long" > // TBD
+//|   < DOUBLE : "double" > // TBD
+//|   < TRIM_SAIL : "TrimSail" > // future statement - TBD
+//|   < REAL : "real" > 
+//|   < INTEGER : "integer" > 
+//|   < CHAR : "char" >
+//|   < BOOLEAN : "boolean" > 
+
+}
+
+TOKEN : /* SPECIAL SYMBOLS */
+{
+//	< LEFT_SHIFT_EQUALS : "<<=" > 
+//|	< RIGHT_SHIFT_EQUALS : ">>=" > 
+//| 	< PLUS_PLUS : "++" > 
+//| 	< MINUS_MINUS : "--" > 
+//|	< LEFT_SHIFT : "<<" > 
+//|  	< RIGHT_SHIFT : ">>" > 
+	< LESS_EQUALS : "<=" > 
+|	< GREATER_EQUALS : ">=" >
+//|	< PLUS_EQUALS : "+=" > 
+//|	< MINUS_EQUALS : "-=" > 
+//|	< STAR_EQUALS : "*=" > 
+//|	< SLASH_EQUALS : "/=" >
+|	< EQUAL_EQUALS : "==" >
+//|	< OR_EQUALS : "|=" > 
+//|	< PERCENT_EQUALS : "%=" >
+//|	< AND_EQUALS : "&=" > 
+//|	< XOR : "^=" >
+|	< OR : "||" > 
+|	< AND : "&&" >
+|	< NOT_EQUALS : "!=" > 
+|	< SLASH_SLASH : "//" >
+|	< STAR_SLASH : "*/" > 
+//|	< TILDA : "~" > 
+|   < BANG : "!" > 
+//|   < AT : "@" > 
+|   < PERCENT : "%" > 
+//|   < UP_ARROW : "^" >
+//|   < AMPERSAND : "&" >
+|   < STAR : "*" > 
+|   < MINUS : "-" >
+|   < PLUS : "+" > 
+|   < EQUALS : "=" >
+//|   < BAR : "|" > 
+|   < SLASH : "/" > 
+//|   < COLON : ":" >
+//|   < SEMICOLON : ";" >
+//|   < QUESTION_MARK : "?" > 
+|   < LESS_THAN : "<" > 
+|   < GREATER_THAN : ">" > 
+//|   < DOT : "." > 
+|   < COMMA : "," >
+|   < QUOTE : "'" > 
+|   < DOUBLE_QUOTE : "\"" >
+|   < LEFT_PAREN : "(" > 
+|   < RIGHT_PAREN : ")" >
+|   < LEFT_BRACKET : "[" >
+|   < RIGHT_BRACKET : "]" >
+|   < LEFT_BRACE : "{" >
+|   < RIGHT_BRACE : "}" >
+|   < BOOTY : "$" > 
+
+}
+
+
+TOKEN: { /* Identifiers and numbers */
+    <IDENTIFIER : <LETTER>(<LETTER>|<DIGIT>)*>
+  | <INTEGER : <UNSIGNED_NUMBER>>
+  | <REAL    : <WHOLE><FRACTION><EXPONENT>
+             | <WHOLE><FRACTION>
+             | <WHOLE><EXPONENT>>
+
+  | <#LETTER : ["a"-"z", "A"-"Z"]>
+  | <#DIGIT  : ["0"-"9"]>
+  | <#SIGN   : ["+", "-"]>
+
+  | <#UNSIGNED_NUMBER : (<DIGIT>)+>
+  | <#WHOLE           : <UNSIGNED_NUMBER>>
+  | <#FRACTION        : "." <UNSIGNED_NUMBER>>
+  | <#EXPONENT        : "E"(<SIGN>)?<UNSIGNED_NUMBER>>
+}
+
+SimpleNode PirateProgram() #void : {SimpleNode rootNode;}
+{
+	try 
+	{
+	  ProgramHeader()  
+	  rootNode = block()
+	  <EOF> {return rootNode;}
+    }
+    catch (ParseException ex) 
+    {
+  		handleError("$");
+  		return null;
+    }
+}
+
+void ProgramHeader() #void : {}
+{
+    <YOHOHO>
+    <IDENTIFIER> {
+        programId = symTabStack.enterLocal(token.image);
+        programId.setDefinition(DefinitionImpl.PROGRAM);
+        programId.setAttribute(ROUTINE_SYMTAB, symTabStack.push());
+        programId.setAttribute(ROUTINE_ROUTINES, new ArrayList<SymTabEntry>()); // initialize
+        symTabStack.setProgramId(programId);
+    }
+    <BOOTY>
+}
+
+SimpleNode block() #void : {SimpleNode rootNode; int index = 1;}
+{
+    { // Enter variable RUM in the symbol table, since Pirates always have RUM!
+        SymTabEntry RumId = symTabStack.enterLocal("RUM");
+    	RumId.setDefinition(DefinitionImpl.VARIABLE);
+        RumId.setTypeSpec(Predefined.integerType);
+        RumId.setIndex(-1); // not a "local variable" to main; treated as global variable (.field)
+        // program always has at least 1 global variable RUM
+        programId.setAttribute(ROUTINE_LOCALS_COUNT, 1); 
+    }
+    //try {
+    Declarations()
+    
+    // parse main procedure signature
+    MainProcedure()
+    
+    //}
+    /*
+    catch (ParseException pe)
+    {
+    	System.out.println("CATCH FROM BLOCK() @ LINE " + pe.currentToken.beginLine);
+    	handleError("$");
+    }
+    */
+    <LEFT_BRACE>
+    (LOOKAHEAD(2)(VariableDeclaration(index, true) {index++;}))*
+    rootNode = FunctionCompoundStatement() // body of main 
+    <RIGHT_BRACE>
+    {return rootNode;}
+    
+}
+
+void MainProcedure() #void : {}
+{
+	<PILLAGE> 
+	<WEIGHANCHOR> 
+	formalParameterList()
+}
+
+void Declarations() #void : {
+} // do not add declarations in parse tree
+{
+  // optional variable declaration section to parse one or more variable declarations
+  ((<BUCCANEERS>)
+  (LOOKAHEAD(2) VariableDeclaration(-1, false))+)? 
+  (LOOKAHEAD(2) (functionDeclaration() 
+  {
+  	 symTabStack.pop(); // pop off func symTab since added to ArrayList
+  	 jjtree.popNode(); // pop off jjtTree
+  }
+  | procedureDeclaration()
+  {
+  	 symTabStack.pop(); // pop off func symTab since added to ArrayList
+  	 jjtree.popNode(); // pop off jjtTree 
+  }
+  ))* // zero or more // 
+
+}
+
+void VariableDeclaration(int index, boolean updateGlobalVarCount) #void : { // do not add declarations in parse tree
+	SymTabEntry variableEntry;
+	TypeSpec type;
+	Token varToken;
+} 
+{
+try {
+  <IDENTIFIER> { // type spec
+  	SymTabEntry typeId = symTabStack.lookup(token.image);
+    typeId.appendLineNumber(token.beginLine);
+    type = typeId.getTypeSpec();
+  }
+  <IDENTIFIER>  {
+ 	varToken = token;
+ 	if (symTabStack.lookupLocal(varToken.image) != null)
+ 	{
+  		System.out.println("--- ALREADY DECLARED VARIABLE ON LINE " + varToken.beginLine + " AT " + varToken.image + " ---");
+ 		errorCount++;
+ 	}
+ 	else 
+ 	{
+    	SymTabEntry variableId = processVariableDecl(token, index);
+    	variableId.setTypeSpec(type);
+    }
+  }
+  (<EQUALS> 
+  Expression()
+  {SymTabEntry varId = symTabStack.lookup(varToken.image);
+  	if (varId.getTypeSpec() == Predefined.integerType && token.kind != INTEGER)
+  	{ 
+  		System.out.println("--- TYPE MISMATCH ON LINE " + token.beginLine + " AT " + token.image + " ---");
+  		errorCount++;
+  	}
+  	else if ((varId.getTypeSpec() == Predefined.booleanType && !token.image.equals("true")) &&
+  			 (varId.getTypeSpec() == Predefined.booleanType && !token.image.equals("false")))
+  	{
+  		System.out.println("--- TYPE MISMATCH ON LINE " + token.beginLine + " AT " + token.image + " ---");  		
+  		errorCount++;
+  	}
+  	else if (varId.getTypeSpec() == Predefined.realType && token.kind != REAL)
+  	{
+  		System.out.println("--- TYPE MISMATCH ON LINE " + token.beginLine + " AT " + token.image + " ---");  		
+  		errorCount++;
+  	}
+  	else if (varId.getTypeSpec() == Predefined.stringType && token.kind != STRING)
+  	{
+  		System.out.println("--- TYPE MISMATCH ON LINE " + token.beginLine + " AT " + token.image + " ---");
+  		errorCount++;
+  	}
+  	else 
+  	{
+  		varId.setAttribute(DATA_VALUE, token.image);
+  	}}
+  )?
+  < BOOTY > {
+  		// update number of global variables in program
+  		if (updateGlobalVarCount) {
+  			int prevCount = (Integer) programId.getAttribute(ROUTINE_LOCALS_COUNT);
+  			programId.setAttribute(ROUTINE_LOCALS_COUNT, prevCount + 1);
+  		}
+  	}
+  }
+   catch(ParseException ex) {
+    	System.out.println("--- VARIABLE DECLARATION ERROR ON LINE " + ex.currentToken.beginLine + " AT " + ex.currentToken.image + " ---");
+    	errorCount++;
+    	handleError("$");  	
+   } 
+   catch(NullPointerException npe) {
+    	System.out.println("--- VARIABLE DECLARATION ERROR ON LINE " + token.beginLine + " AT " + token.image + " ---");
+    	errorCount++;    	
+    	handleError("$");
+   } 
+}
+
+
+void ParameterVariableDeclaration(int index) #void : { // do not add declarations in parse tree
+	SymTabEntry variableEntry;
+	TypeSpec type;
+	Token varToken;
+} 
+{
+//try {
+  <IDENTIFIER> { // type spec
+  	SymTabEntry typeId = symTabStack.lookup(token.image);
+    typeId.appendLineNumber(token.beginLine);
+    type = typeId.getTypeSpec();
+  }
+  <IDENTIFIER>  {
+ 	varToken = token;
+    SymTabEntry variableId = processParameterVariableDecl(token, index);
+    variableId.setTypeSpec(type);
+  }
+}
+
+TOKEN: { /*	Error token */
+    <ERROR : ~["\r", "\n"]>
+}
+
+void Statement() #void : {}
+{ 
+try {
+	CompoundStatement() // Outside booty requirement to prevent the need for 2+ booties. 
+	|
+	(//AssignmentStatement() // DELETE THIS LINE WHEN UNCOMMENT BELOW
+    	(LOOKAHEAD(2) AssignmentStatement()| procedureCall()) 
+    	| ifStatement() 
+    //	| condStatement() 
+    	| whileStatement() 
+    //	| doWhileStatement()
+    //	| breakStatement()
+    	| ForStatement()
+    //	| CaseStatement()
+    	| returnStatement()
+    	| printStatement())
+   
+    	<BOOTY>
+    }
+    catch (NullPointerException npe)
+    {
+    	System.out.println("--- USE OF UNDECLARED VARIABLE " + token.image + " ON LINE: " + token.beginLine + " ---");
+    	errorCount++;
+    	handleError("$");
+    }
+    catch (ParseException pe)
+    {
+    	System.out.println("--- PARSE ERROR ON LINE " + pe.currentToken.beginLine + " AT " + pe.currentToken.image);
+    	errorCount++;
+    	handleError("$");
+    }
+    
+    //{return jjtThis;} // Since function body = Statement() should be returning jjtThis
+}
+
+void ProcedureBody() : {}
+{ 
+    AssignmentStatement()
+    | CompoundStatement()
+    | ifStatement() 
+ //   | condStatement() 
+    | whileStatement() 
+ //   | doWhileStatement()
+ //   | breakStatement()
+    | ForStatement()
+ //   | CaseStatement()
+}
+
+void LessThan() #LessThan(2) : {}
+{
+	<LESS_THAN>
+	SimpleExpression()
+}
+
+void GreaterThan() #GreaterThan(2) : {}
+{
+	<GREATER_THAN>
+	SimpleExpression()
+}
+
+void LessEquals() #LessEquals(2) : {}
+{
+	<LESS_EQUALS>
+	SimpleExpression()
+}
+
+void GreaterEquals() #GreaterEquals(2) : {}
+{
+	<GREATER_EQUALS>
+	SimpleExpression()
+}
+
+void NotEquals() #NotEquals(2) : {}
+{
+	<NOT_EQUALS>
+	SimpleExpression()
+}
+
+void EqualEquals() #EqualEquals(2) : {}
+{
+	<EQUAL_EQUALS>
+	SimpleExpression()
+}
+
+void Expression() #void : {}
+{
+  SimpleExpression()
+  (LessThan() | GreaterThan() | LessEquals() 
+  | GreaterEquals() | NotEquals() | EqualEquals())? // zero or one}
+
+void SimpleExpression() #void : {}
+{
+	("+" Term() | Negate() | Term())
+	(Plus() | Minus() | Or())* // zero or more
+}
+
+void Negate() : {}
+{
+    "-"
+    Term()
+}
+
+void Plus() #Plus(2) : {}
+{
+    "+"
+    Term()
+}
+
+void Minus() #Minus(2) : {}
+{
+    "-"
+    Term()
+}
+
+void Or() #Or(2) : {}
+{
+    "||"
+    Term()
+}
+
+void Term() #void : {}
+{
+	Factor()
+	((Multiply()|
+	 Divide()| // will this need 1 slash or two slashes to read properly?
+   //("DIV"{buf.append(token.image + " ");})| // a second div? One for float, one for int divide?
+	 Modulo()|
+	 And()) )* // zero or more
+}
+
+void Multiply() #Multiply(2) : {}
+{
+    "*"
+    Factor()
+}
+
+void Divide() #Divide(2) : {}
+{
+    "/"
+    Factor()
+}
+
+void Modulo() #Modulo(2) : {}
+{
+    "%"
+    Factor()
+}
+
+void And() #And(2) : {}
+{
+    "&&"
+    Factor()
+}
+
+void IntegerConstant() : {}
+{
+    <INTEGER> {
+        jjtThis.setTypeSpec(Predefined.integerType);
+        jjtThis.setAttribute(VALUE, Integer.parseInt(token.image));
+    }
+}
+
+void RealConstant() : {}
+{
+    <REAL> {
+        jjtThis.setTypeSpec(Predefined.realType);
+        jjtThis.setAttribute(VALUE, Float.parseFloat(token.image));
+    }
+}
+
+void Error() #void : {}
+{
+    <ERROR>
+}
+
+void Factor() #void : {}{
+//Variable() // DELETE THIS WHEN UNCOMMENT BELOW
+     (LOOKAHEAD(2) FunctionCall() 
+     | Variable())
+     | IntegerConstant()
+     | RealConstant()
+     | String()
+     | Character()
+     | Not()
+     | ((<LEFT_PAREN>)
+    	 Expression()
+    	(<RIGHT_PAREN>))}
+
+void String() : {}
+{
+    <STRING> {
+        jjtThis.setTypeSpec(Predefined.stringType);
+    	jjtThis.setAttribute(VALUE, token.image);
+    }
+}
+
+void Character() : {}
+{
+    <CHARACTER>  {
+        jjtThis.setTypeSpec(Predefined.charType);
+        jjtThis.setAttribute(VALUE, token.image);
+    }
+}
+
+void Not() : {}
+{
+    <BANG> 
+    Factor()
+}void AssignmentStatement() #Assign : {}
+{
+  Variable() {
+  
+  	SymTabEntry variableId = symTabStack.lookup(token.image);
+    variableId.appendLineNumber(token.beginLine);
+  } 
+  ("="
+  Expression())+
+}
+
+void ifStatement() #If : {}
+{
+  < ARRR > 
+  <LEFT_PAREN>
+  Expression()
+  <RIGHT_PAREN>
+  Statement()
+  (LOOKAHEAD(2) <THARSHEBLOWS> 
+  Statement())? // zero or one "else" statement
+  
+}
+
+/*
+void condStatement() #Cond : {} // similar to Scheme's cond statement; like nested if's
+{
+  <LOOT> 
+  <LEFT_BRACKET>  
+  (CondBranch())+ // one or more conditions with corresponding statements
+  <THARSHEBLOWS>  // required else condition
+  DefaultBranch()
+  <RIGHT_BRACKET>
+}
+*/
+
+/*
+void CondBranch() : {} 
+{
+  Condition()
+  Statement() 
+}
+*/
+
+/*
+void DefaultBranch() : {}
+{
+  Statement()
+}
+*/
+
+void whileStatement() #Loop : {}
+{
+	<MAKESAIL> 
+	Condition()
+	Statement()
+}
+
+/*
+void doWhileStatement() #Loop : {}
+{
+	<STEER> 
+	Statement()
+	<MAKESAIL> 
+	Condition()
+	<BOOTY> 
+}
+*/
+
+/*
+void breakStatement() #Break : {}
+{
+	<WALKTHEPLANK>
+}
+*/
+
+void returnStatement() #Return : {}
+{
+	<OVERBOARD> 
+	(String() | IntegerConstant() | RealConstant() | Variable())
+}
+
+void printStatement() #Print : {}
+{
+	<HARHARHAR>
+	<LEFT_PAREN>
+	(String() | IntegerConstant() | RealConstant() | Variable())
+	<RIGHT_PAREN>
+}
+
+void ForStatement() #For : {}
+{
+	<FORE> 
+	ForInitializeStatement()
+	("{")
+	statementList()
+	("}")
+}
+
+void ForInitializeStatement() #Assign : {}
+{
+	RumVariable()
+	<EQUALS> 
+	IntegerConstant()
+}
+
+void RumVariable() #Variable : {}
+{
+	<RUM> {
+	   SymTabEntry variableId = symTabStack.lookup(token.image);
+       variableId.appendLineNumber(token.beginLine);
+   	   jjtThis.setAttribute(ID, variableId);
+	}
+}
+
+/*
+void CaseStatement() #Select : {}
+{
+	<SHIVERMETIMBERS>
+	<LEFT_PAREN>
+	Expression()
+	<RIGHT_PAREN>	(LOOKAHEAD(2) (CaseBranch())+ 	(<POOPDECK> DefaultBranch()))? // default case zero or one
+}
+*/
+
+/*
+void CaseConstant() #SelectConstant : {}
+{
+	IntegerConstant()
+}
+*/
+
+/*
+void CaseBranch() #SelectBranch(2) : {}
+{
+	<AHOY>
+	CaseConstant()
+	<COLON>
+	Statement()
+}
+*/
+
+void MethodName() #Routine : {}
+{
+	<IDENTIFIER> 
+	{
+ 		SymTabEntry functionId = symTabStack.lookup(token.image);
+    	functionId.appendLineNumber(token.beginLine);
+    	TypeSpec type = functionId.getTypeSpec();
+    	jjtThis.setTypeSpec(type);
+    	jjtThis.setAttribute(ID, functionId);
+  	}
+}
+
+//SimpleNode functionDeclaration() #void : {
+void functionDeclaration() #void : { 
+	SymTabEntry functionId = null;
+	SimpleNode functionRootNode;
+	SymTab functionSymTab;
+	SymTabEntry functionEntry;
+	TypeSpec type;
+	Token functionToken;
+	int index = 0; 
+	boolean returnTypeError = false;
+} 
+{
+	try {
+		 < GUNNER > 
+		 < IDENTIFIER > { // same as   < INT > | < CHAR > | < BOOLEAN > 
+		 	SymTabEntry typeId = symTabStack.lookup(token.image);
+		 	typeId.appendLineNumber(token.beginLine);
+		 	type = typeId.getTypeSpec();
+		 	
+		 }
+		 < IDENTIFIER > { // same as < IDENTIFIER >
+		 	functionToken = token;
+		 	functionId = symTabStack.enterLocal(token.image);
+		 	functionId.setDefinition(DefinitionImpl.FUNCTION);
+		 	functionId.appendLineNumber(token.beginLine);
+		 	functionId.setTypeSpec(type);
+		 	functionId.setAttribute(ROUTINE_SYMTAB, symTabStack.push());
+		 }
+		 
+		 index = formalParameterList()
+		 <LEFT_BRACE>
+		 (LOOKAHEAD(2)(VariableDeclaration(index, false) {index++;}))*
+		 functionRootNode = FunctionCompoundStatement() // function body
+		 <RIGHT_BRACE>
+		 {  	 
+		 	functionId.setAttribute(ROUTINE_LOCALS_COUNT, index);
+		 	functionId.setTypeSpec(type);
+        	ICode iCode = ICodeFactory.createICode();
+        	iCode.setRoot(functionRootNode);
+		 	functionId.setAttribute(ROUTINE_ICODE, iCode);
+	  	 	ArrayList<SymTabEntry> routines = (ArrayList<SymTabEntry>) programId.getAttribute(ROUTINE_ROUTINES);
+	  	 	routines.add(functionId);
+	  	 	programId.setAttribute(ROUTINE_ROUTINES, routines);
+		 }
+	 }
+	 catch(ParseException ex) {
+	 	System.out.println("--- ERROR IN FUNCTION DECLARATION ON LINE " + ex.currentToken.beginLine + " AT " + ex.currentToken.image + " ---");
+	 	errorCount++;
+	 	handleError("$");
+	 }
+	 catch(NullPointerException npe)
+	 {
+	 	System.out.println("--- MISSING RETURN TYPE OR PARAMETER TYPE ON LINE " + token.beginLine + " AT " + token.image + " ---");
+	 	errorCount++;
+	 	handleError("}");
+	 }	
+}
+
+
+void procedureDeclaration() #void : {
+	SymTabEntry procedureId;
+	SimpleNode procedureRootNode;
+	SymTab procedureSymTab;
+	SymTabEntry procedureEntry;
+	Token procedureToken;
+	int index = 0;
+} 
+{
+	 < PILLAGE > 
+	 < IDENTIFIER> // same as method name
+	 { 
+		 procedureToken = token;
+		 procedureId = symTabStack.enterLocal(token.image);
+		 procedureId.setDefinition(DefinitionImpl.PROCEDURE);
+		 procedureId.appendLineNumber(token.beginLine);
+		 procedureId.setAttribute(ROUTINE_SYMTAB, symTabStack.push());
+	}
+	 index = formalParameterList()
+	 <LEFT_BRACE>
+	 (LOOKAHEAD(2)(VariableDeclaration(index, false) {index++;}))*
+	 procedureRootNode = FunctionCompoundStatement() // also procedure body
+     <RIGHT_BRACE>
+	 //procedureRootNode = CompoundStatement()//ProcedureBody() // procedure body
+	 {  	 
+	 	procedureId.setAttribute(ROUTINE_LOCALS_COUNT, index);
+	 	
+    	ICode iCode = ICodeFactory.createICode();
+    	iCode.setRoot(procedureRootNode);
+	 	procedureId.setAttribute(ROUTINE_ICODE, iCode);
+  	 	ArrayList<SymTabEntry> routines = (ArrayList<SymTabEntry>) programId.getAttribute(ROUTINE_ROUTINES);
+  	 	routines.add(procedureId);
+  	 	programId.setAttribute(ROUTINE_ROUTINES, routines);
+	 }
+}
+
+
+int formalParameterList() #void : {
+	SymTabEntry typeId;
+	TypeSpec type;
+	int index = 0;
+}
+{
+	<LEFT_PAREN> 
+	 (//<IDENTIFIER> { // type spec
+  	//typeId = symTabStack.lookup(token.image);
+    //typeId.appendLineNumber(token.beginLine);
+    //type = typeId.getTypeSpec();
+  //}
+  ParameterVariableDeclaration(index){index++;} // ADDED
+	 //Variable()
+ 	 ((<COMMA> 
+ 	// <IDENTIFIER> { // type spec
+  	//typeId = symTabStack.lookup(token.image);
+    //typeId.appendLineNumber(token.beginLine);
+    //type = typeId.getTypeSpec();
+  //}
+  ParameterVariableDeclaration(index) {index++;})*))* // ADDED
+ 	 //Variable())*))* // zero or more comma-separated parameters
+ 	 <RIGHT_PAREN> 
+	{return index;}
+}
+
+
+SimpleNode actualParameterList() #Parameters: {}
+{
+	(LOOKAHEAD(2) (<LEFT_PAREN>
+	<RIGHT_PAREN>) 
+	|
+	(<LEFT_PAREN>
+	Expression()
+	((<COMMA>
+	 Expression())*) // zero or more comma-separated arguments
+	 <RIGHT_PAREN>))
+	 {
+	 	return jjtThis;
+	 } 
+}
+
+SimpleNode FunctionCall() #Call: {}
+{
+	MethodName()
+	//<LEFT_PAREN>
+	actualParameterList()
+	//<RIGHT_PAREN>
+	{
+		return jjtThis;
+	}
+}
+
+SimpleNode procedureCall() #Call: {}
+{
+	MethodName()
+	//<LEFT_PAREN>
+	actualParameterList()
+	//<RIGHT_PAREN>
+	{
+		return jjtThis;
+	}
+} 
+
+void Condition() #Test : {}
+{
+	<LEFT_PAREN>
+	Expression()
+	<RIGHT_PAREN>
+}
+
+SimpleNode CompoundStatement() #Compound : {}
+{
+	<LEFT_BRACE> 
+	statementList()
+	<RIGHT_BRACE>
+	{return jjtThis;}
+}
+
+SimpleNode FunctionCompoundStatement() #Compound : {}
+{
+	statementList()
+	{return jjtThis;}
+}
+
+void statementList() #void : {}
+{
+	(Statement())*
+}
+
+void Variable() : {}
+{
+ < IDENTIFIER > {
+ 	SymTabEntry variableId = symTabStack.lookup(token.image);
+    variableId.appendLineNumber(token.beginLine);
+    TypeSpec type = variableId.getTypeSpec();
+    jjtThis.setTypeSpec(type);
+    jjtThis.setAttribute(ID, variableId);
+ }
+}
+
+/*void Error() #void : {}
+{
+    <ERROR>
+}*/
+
+
+
+JAVACODE
+SymTabEntry processVariableDecl(Token token, int index) #void
+{
+    SymTabEntry variableId = symTabStack.enterLocal(token.image);
+    // set index to remember .var order in jasmin code
+    variableId.setIndex(index);
+    variableId.setDefinition(DefinitionImpl.VARIABLE);
+    variableId.appendLineNumber(token.beginLine);
+    return variableId;
+}
+
+JAVACODE
+SymTabEntry processParameterVariableDecl(Token token, int index) #void
+{
+    SymTabEntry variableId = symTabStack.enterLocal(token.image);
+    // set index to remember .var order in jasmin code
+    variableId.setIndex(index);
+    variableId.setDefinition(DefinitionImpl.VALUE_PARM);
+    variableId.appendLineNumber(token.beginLine);
+    return variableId;
+}
+
+JAVACODE
+String handleError(String delimiter) #void
+{
+    Token token;
+    do {
+    	token = getNextToken();
+    } while (!token.image.equals(delimiter));
+    return token.image;
+}
